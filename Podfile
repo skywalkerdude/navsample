@@ -4,4 +4,5 @@ target 'NavSample' do
 
   # Pods for NavApp
   pod 'RealmSwift'
+  pod 'Introspect'
 end
