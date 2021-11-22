@@ -1,112 +1,63 @@
 import Combine
 import SwiftUI
-import RealmSwift
+import Introspect
 
 struct ContentView: View {
-
-    @ObservedObject private var viewModel = ContentViewModel()
-
+    
     var body: some View {
-        NavigationView {
-            List(viewModel.details) { detail in
-                NavigationLink(destination: DetailView(viewModel: detail)) {
-                    Text(detail.text)
-                }
+        TabView {
+            NavigationView {
+                TabItemView(num: 1)
+            }.tabItem {
+                Text("One")
             }
-        }.onAppear {
-            viewModel.load()
+            NavigationView {
+                TabItemView(num: 2)
+            }.tabItem {
+                Text("Two")
+            }
         }
     }
 }
 
-class ContentViewModel: ObservableObject {
-
-    static let dataStore = DataStore()
-
-    @Published var details = [DetailViewModel]()
-    private var disposables = Set<AnyCancellable>()
-
-    func load() {
-        Self.dataStore.getData()
-            .replaceError(with: [])
-            .sink { entities in
-                self.details = entities.map({ entity in
-                    DetailViewModel(text: entity.text)
-                })
-            }.store(in: &disposables)
+struct TabItemView: View {
+    
+    private let num: Int
+    
+    init(num: Int) {
+        self.num = num
+    }
+    
+    var body: some View {
+        NavigationLink(destination: DetailView(text: "Detail View \(num)").introspectViewController { viewController in
+            if viewController is UITabBarController {
+                print("booyah UITabBarController")
+            }
+            if viewController is UINavigationController {
+                print("booyah UINavigationController")
+            }
+            viewController.hidesBottomBarWhenPushed = true
+        }) {
+            Text("Go to Detail View")
+        }
     }
 }
 
 struct DetailView: View {
-
-    @ObservedObject var viewModel: DetailViewModel
-
-    var body: some View {
-        ZStack {
-            Text(viewModel.text)
-        }.onAppear {
-            viewModel.onAppear()
-        }
-    }
-}
-
-class DetailViewModel: ObservableObject, Identifiable {
-
-    @Published var text: String = ""
-    private let dataStore = ContentViewModel.dataStore
-
+    
+    @State private var showingSheet = false
+    
+    private let text: String
+    
     init(text: String) {
         self.text = text
     }
     
-    func onAppear() {
-        self.dataStore.storeData(entity: Entity(text: text, created: Date()))
-    }
-}
-
-class DataStore {
-    private let realm: Realm
-    init() {
-        self.realm = try! Realm()
-        try! realm.write {
-            realm.add(Entity(text: "Entity 1", created: Date()), update: .modified)
-            realm.add(Entity(text: "Entity 2", created: Date()), update: .modified)
-            realm.add(Entity(text: "Entity 3", created: Date()), update: .modified)
-            realm.add(Entity(text: "Entity 4", created: Date()), update: .modified)
+    var body: some View {
+        Button("Open Sheet") {
+            showingSheet.toggle()
+        }.sheet(isPresented: $showingSheet) {
+            Text("Sheet Text")
         }
-    }
-    
-    func getData() -> AnyPublisher<[Entity], Error> {
-        realm.objects(Entity.self).sorted(byKeyPath: "created", ascending: false).collectionPublisher
-            .map({ results -> [Entity] in
-                results.map { entity -> Entity in
-                    entity
-                }
-            }).eraseToAnyPublisher()
-    }
-    
-    func storeData(entity: Entity) {
-        try! realm.write {
-            realm.add(entity, update: .modified)
-        }
-    }
-}
-
-class Entity: Object {
-    @objc dynamic var text: String!
-    @objc dynamic var created: Date!
-
-    override required init() {
-        super.init()
-    }
-
-    init(text: String, created: Date) {
-        super.init()
-        self.text = text
-        self.created = created
-    }
-
-    override static func primaryKey() -> String? {
-        return "text"
     }
 }
